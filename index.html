@@ -976,9 +976,9 @@
     
     <div class="wave-bg"></div>
 
-    <script>
+  <script>
     // الكود الأساسي للوظائف
-    const apiUrl = "https://script.google.com/macros/s/AKfycbziHmymaxKb404ItTk3nQo5GSicoCT8RY2zivhr68Zu01aiP1RF3z58nC51mns2F8ks/exec";
+    const apiUrl = "https://script.google.com/macros/s/AKfycbwjnk95cjj8e2U6LwDDbFDauRS4Pb1z5i7NN2XsyAbP--Hxg23zsUHT1060ips55-Th/exec";
 
     let currentUser = null;
     const permissions = {
@@ -991,10 +991,10 @@
     // أسعار الصرف الافتراضية
     const exchangeRates = {
         USD: 1,
-        SYL: 13000, // مثال
-        TRL: 30     // مثال
+        SYL: 13000,
+        TRL: 30
     };
-    
+
     // متغيرات التطبيق
     let currentWarehousePage = 1;
     let currentIncomingPage = 1;
@@ -1002,30 +1002,41 @@
     let currentUsersPage = 1;
     const itemsPerPage = 10;
 
-    // تسجيل الدخول
+    // دالة محسنة لجلب البيانات
+    async function fetchData(sheetName) {
+        try {
+            const response = await fetch(`${apiUrl}?action=get&sheet=${encodeURIComponent(sheetName)}`);
+            const data = await response.json();
+            
+            if (data.status !== "success") {
+                throw new Error(data.message || "خطأ في جلب البيانات");
+            }
+            
+            return data.data;
+        } catch (error) {
+            console.error(`Error fetching ${sheetName}:`, error);
+            showToast(`حدث خطأ أثناء جلب بيانات ${sheetName}`, "error");
+            return null;
+        }
+    }
+
+    // تسجيل الدخول (معدلة)
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const user = document.getElementById('username').value;
         const pass = document.getElementById('password').value;
         
-        // تأثير أثناء التحميل
         const btn = e.target.querySelector('button[type="submit"]');
         const originalBtnText = btn.innerHTML;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> جاري التحقق...';
         btn.disabled = true;
         
         try {
-            const response = await fetch(apiUrl + "?action=login&username=" + encodeURIComponent(user) + "&password=" + encodeURIComponent(pass));
+            const response = await fetch(`${apiUrl}?action=login&username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`);
             const result = await response.json();
             
             if (result.status === "success") {
-                currentUser = { 
-                    name: user,
-                    username: user,
-                    role: result.role || 'user',
-                    status: 'نشط'
-                };
-                
+                currentUser = result;
                 document.getElementById('loginScreen').classList.add('animate__animated', 'animate__fadeOut');
                 setTimeout(() => {
                     document.getElementById('loginScreen').classList.add('hidden');
@@ -1034,867 +1045,67 @@
                     document.getElementById('userRole').textContent = currentUser.role;
                     applyPermissions();
                     refreshAllData();
-                    
                     setTimeout(initializeCharts, 500);
                 }, 500);
             } else {
                 showError("بيانات الدخول غير صحيحة");
-                btn.innerHTML = originalBtnText;
-                btn.disabled = false;
-                
-                document.getElementById('loginForm').classList.add('animate__animated', 'animate__headShake');
-                setTimeout(() => {
-                    document.getElementById('loginForm').classList.remove('animate__animated', 'animate__headShake');
-                }, 1000);
             }
         } catch (error) {
             showError("حدث خطأ في الاتصال بالخادم");
+            console.error("Login error:", error);
+        } finally {
             btn.innerHTML = originalBtnText;
             btn.disabled = false;
-            console.error("Login error:", error);
         }
     });
-    
-    function showError(message) {
-        const errorDiv = document.getElementById('errorMessage');
-        errorDiv.textContent = message;
-        errorDiv.classList.remove('hidden');
-        
-        setTimeout(() => {
-            errorDiv.classList.add('animate__animated', 'animate__fadeOut');
-            setTimeout(() => {
-                errorDiv.classList.remove('animate__animated', 'animate__fadeOut');
-                errorDiv.classList.add('hidden');
-            }, 500);
-        }, 3000);
-    }
-    
-    // تطبيق الصلاحيات
-    function applyPermissions() {
-        const rolePerm = permissions[currentUser.role];
-        
-        // إخفاء الأقسام غير المسموح بها
-        if (!rolePerm.warehouse) document.getElementById('btnWarehouse').style.display = "none";
-        if (!rolePerm.incoming) document.getElementById('btnIncoming').style.display = "none";
-        if (!rolePerm.outgoing) document.getElementById('btnOutgoing').style.display = "none";
-        if (!rolePerm.reports) document.getElementById('btnReports').style.display = "none";
-        if (!rolePerm.users) document.getElementById('btnUsers').style.display = "none";
-        
-        // إخفاء أزرار التعديل إذا لم يكن لديه صلاحية
-        if (!rolePerm.edit) {
-            document.querySelectorAll('.edit-btn').forEach(btn => btn.style.display = "none");
-            document.querySelectorAll('.delete-btn').forEach(btn => btn.style.display = "none");
-        }
-    }
-    
-    // تسجيل الخروج
-    function logout() {
-        // تأثير الخروج
-        document.getElementById('dashboard').classList.add('animate__animated', 'animate__fadeOut');
-        setTimeout(() => {
-            currentUser = null;
-            document.getElementById('dashboard').classList.add('hidden');
-            document.getElementById('loginScreen').classList.remove('hidden', 'animate__fadeOut');
-            document.getElementById('loginScreen').classList.add('animate__animated', 'animate__fadeIn');
-            document.getElementById('loginForm').reset();
-            document.getElementById('errorMessage').classList.add('hidden');
-            
-            // إعادة تعيين الصلاحيات
-            document.getElementById('btnWarehouse').style.display = "block";
-            document.getElementById('btnIncoming').style.display = "block";
-            document.getElementById('btnOutgoing').style.display = "block";
-            document.getElementById('btnReports').style.display = "block";
-            document.getElementById('btnUsers').style.display = "block";
-        }, 500);
-    }
-    
-    // عرض القسم المحدد
-    function showSection(id) {
-        const rolePerm = permissions[currentUser.role];
-        const sectionMap = {
-            'dashboardSection': rolePerm.dashboard,
-            'warehouseSection': rolePerm.warehouse,
-            'incomingSection': rolePerm.incoming,
-            'outgoingSection': rolePerm.outgoing,
-            'reportsSection': rolePerm.reports,
-            'usersSection': rolePerm.users
-        };
-        
-        if (!sectionMap[id]) {
-            showToast("ليس لديك صلاحية للوصول لهذا القسم", "error");
-            return;
-        }
-        
-        // تحديث العنوان
-        const titles = {
-            'dashboardSection': 'لوحة التحكم',
-            'warehouseSection': 'إدارة المستودع',
-            'incomingSection': 'إدارة الواردات',
-            'outgoingSection': 'إدارة الصادرات',
-            'reportsSection': 'التقارير المالية',
-            'usersSection': 'إدارة المستخدمين'
-        };
-        document.getElementById('currentSectionTitle').textContent = titles[id];
-        
-        // إخفاء جميع الأقسام وإظهار القسم المحدد
-        document.querySelectorAll('.content-section').forEach(s => {
-            s.classList.add('hidden');
-            s.classList.remove('animate__animated', 'animate__fadeIn');
-        });
-        
-        const activeSection = document.getElementById(id);
-        activeSection.classList.remove('hidden');
-        activeSection.classList.add('animate__animated', 'animate__fadeIn');
-        
-        // تحديث القائمة الجانبية النشطة
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        document.getElementById(`btn${id.replace('Section', '')}`).classList.add('active');
-        
-        // إذا كان قسم التقارير، قم بتحميل الرسوم البيانية
-        if (id === 'reportsSection') {
-            setTimeout(initializeCharts, 300);
-        }
-    }
-    
-    // تبديل الشريط الجانبي
-    document.getElementById('toggleSidebar').addEventListener('click', function() {
-        const sidebar = document.getElementById('sidebar');
-        const isCollapsed = sidebar.classList.contains('sidebar-collapsed');
-        
-        if (isCollapsed) {
-            sidebar.classList.remove('sidebar-collapsed');
-            sidebar.classList.add('sidebar-expanded');
-        } else {
-            sidebar.classList.remove('sidebar-expanded');
-            sidebar.classList.add('sidebar-collapsed');
-        }
-        
-        // تبديل حالة زر القائمة
-        this.classList.toggle('hamburger-active');
-    });
-    
-    // تهيئة الرسوم البيانية
-    function initializeCharts() {
-        // رسم بياني للمخزون
-        const inventoryCtx = document.getElementById('inventoryChart').getContext('2d');
-        if (window.inventoryChart) {
-            window.inventoryChart.destroy();
-        }
-        
-        window.inventoryChart = new Chart(inventoryCtx, {
-            type: 'bar',
-            data: {
-                labels: ['منتوج 1', 'منتوج 2', 'منتوج 3', 'منتوج 4', 'منتوج 5'],
-                datasets: [{
-                    label: 'الكمية المتاحة',
-                    data: [12, 19, 3, 5, 2],
-                    backgroundColor: [
-                        'rgba(79, 70, 229, 0.7)',
-                        'rgba(16, 185, 129, 0.7)',
-                        'rgba(245, 158, 11, 0.7)',
-                        'rgba(239, 68, 68, 0.7)',
-                        'rgba(139, 92, 246, 0.7)'
-                    ],
-                    borderColor: [
-                        'rgba(79, 70, 229, 1)',
-                        'rgba(16, 185, 129, 1)',
-                        'rgba(245, 158, 11, 1)',
-                        'rgba(239, 68, 68, 1)',
-                        'rgba(139, 92, 246, 1)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                        rtl: true
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
-            }
-        });
-        
-        // رسم بياني للمبيعات (باستخدام ApexCharts)
-        if (document.getElementById('salesChart')) {
-            const salesOptions = {
-                series: [{
-                    name: 'الواردات',
-                    data: [30, 40, 35, 50, 49, 60, 70, 91, 125, 110, 95, 120]
-                }, {
-                    name: 'الصادرات',
-                    data: [20, 35, 25, 45, 40, 55, 65, 80, 110, 95, 80, 100]
-                }],
-                chart: {
-                    type: 'area',
-                    height: 350,
-                    stacked: false,
-                    toolbar: {
-                        show: true,
-                        tools: {
-                            download: true,
-                            selection: true,
-                            zoom: true,
-                            zoomin: true,
-                            zoomout: true,
-                            pan: true,
-                            reset: true
-                        }
-                    }
-                },
-                colors: ['#4f46e5', '#10b981'],
-                dataLabels: {
-                    enabled: false
-                },
-                stroke: {
-                    curve: 'smooth'
-                },
-                fill: {
-                    type: 'gradient',
-                    gradient: {
-                        shadeIntensity: 1,
-                        inverseColors: false,
-                        opacityFrom: 0.5,
-                        opacityTo: 0,
-                        stops: [0, 90, 100]
-                    }
-                },
-                labels: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'],
-                xaxis: {
-                    type: 'category'
-                },
-                tooltip: {
-                    shared: true,
-                    intersect: false,
-                    y: {
-                        formatter: function (val) {
-                            return val + " وحدة";
-                        }
-                    }
-                },
-                legend: {
-                    position: 'top',
-                    horizontalAlign: 'right'
-                },
-                rtl: true
-            };
-            
-            const salesChart = new ApexCharts(document.querySelector("#salesChart"), salesOptions);
-            salesChart.render();
-        }
-        
-        // رسم بياني لأفضل العملاء
-        if (document.getElementById('topCustomersChart')) {
-            const customersOptions = {
-                series: [{
-                    name: 'المبيعات',
-                    data: [400, 350, 300, 250, 200]
-                }],
-                chart: {
-                    type: 'bar',
-                    height: 350
-                },
-                plotOptions: {
-                    bar: {
-                        borderRadius: 4,
-                        horizontal: true,
-                    }
-                },
-                dataLabels: {
-                    enabled: false
-                },
-                colors: ['#4f46e5'],
-                xaxis: {
-                    categories: ['العميل 1', 'العميل 2', 'العميل 3', 'العميل 4', 'العميل 5'],
-                },
-                rtl: true
-            };
-            
-            const customersChart = new ApexCharts(document.querySelector("#topCustomersChart"), customersOptions);
-            customersChart.render();
-        }
-        
-        // رسم بياني لأفضل المنتجات
-        if (document.getElementById('topProductsChart')) {
-            const productsOptions = {
-                series: [44, 55, 41, 17, 15],
-                chart: {
-                    type: 'donut',
-                    height: 350
-                },
-                labels: ['منتج 1', 'منتج 2', 'منتج 3', 'منتج 4', 'منتج 5'],
-                colors: ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
-                responsive: [{
-                    breakpoint: 480,
-                    options: {
-                        chart: {
-                            width: 200
-                        },
-                        legend: {
-                            position: 'bottom'
-                        }
-                    }
-                }],
-                legend: {
-                    position: 'right',
-                    rtl: true
-                }
-            };
-            
-            const productsChart = new ApexCharts(document.querySelector("#topProductsChart"), productsOptions);
-            productsChart.render();
-        }
-    }
-    
-    // تبديل عرض النماذج
-    function toggleWarehouseForm() {
-        document.getElementById('warehouseFormContainer').classList.toggle('hidden');
-    }
-    
-    function toggleIncomingForm() {
-        document.getElementById('incomingFormContainer').classList.toggle('hidden');
-    }
-    
-    function toggleOutgoingForm() {
-        document.getElementById('outgoingFormContainer').classList.toggle('hidden');
-    }
-    
-    function toggleUserForm() {
-        document.getElementById('userFormContainer').classList.toggle('hidden');
-    }
-    
-    // عرض رسائل التنبيه
-    function showToast(message, type = 'success') {
-        const toast = document.createElement('div');
-        toast.className = `fixed top-4 right-4 z-50 p-4 rounded-md shadow-lg text-white animate__animated animate__fadeInRight ${
-            type === 'success' ? 'bg-green-500' : 
-            type === 'error' ? 'bg-red-500' : 
-            'bg-blue-500'
-        }`;
-        toast.innerHTML = `
-            <div class="flex items-center">
-                <i class="fas ${
-                    type === 'success' ? 'fa-check-circle' : 
-                    type === 'error' ? 'fa-exclamation-circle' : 
-                    'fa-info-circle'
-                } mr-2"></i>
-                <span>${message}</span>
-            </div>
-        `;
-        
-        document.body.appendChild(toast);
-        
-        setTimeout(() => {
-            toast.classList.add('animate__fadeOutRight');
-            setTimeout(() => {
-                toast.remove();
-            }, 500);
-        }, 3000);
-    }
-    
-    // تحميل جميع البيانات
-    async function refreshAllData() {
-        try {
-            showToast("جاري تحديث البيانات...", "info");
-            
-            const rolePerm = permissions[currentUser.role];
-            const promises = [];
-            
-            if (rolePerm.dashboard) {
-                promises.push(loadDashboardStats());
-                promises.push(loadLatestTransactions());
-            }
-            if (rolePerm.warehouse) promises.push(loadWarehouse());
-            if (rolePerm.incoming) promises.push(loadIncoming());
-            if (rolePerm.outgoing) promises.push(loadOutgoing());
-            if (rolePerm.reports) promises.push(loadReports());
-            if (rolePerm.users) promises.push(loadUsers());
-            
-            await Promise.all(promises);
-            showToast("تم تحديث البيانات بنجاح", "success");
-        } catch (error) {
-            console.error("Error refreshing data:", error);
-            showToast("حدث خطأ أثناء تحديث البيانات", "error");
-        }
-    }
-    
-    // تحميل إحصائيات لوحة التحكم
-    async function loadDashboardStats() {
-        try {
-            const [incoming, outgoing] = await Promise.all([
-                fetch(apiUrl + "?sheet=الواردات").then(r => r.json()),
-                fetch(apiUrl + "?sheet=الصادرات").then(r => r.json())
-            ]);
-            
-            const totalPurchases = incoming.data.slice(1).reduce((sum, row) => sum + (+row[4] * +row[5]), 0);
-            const totalSales = outgoing.data.slice(1).reduce((sum, row) => sum + (+row[4] * +row[5]), 0);
-            const profit = totalSales - totalPurchases;
-            
-            document.getElementById('totalIncoming').textContent = totalPurchases.toLocaleString() + " USD";
-            document.getElementById('totalOutgoing').textContent = totalSales.toLocaleString() + " USD";
-            document.getElementById('netProfit').textContent = profit.toLocaleString() + " USD";
-            
-            // تحميل إحصائيات المخزون
-            const warehouse = await fetch(apiUrl + "?sheet=المخزون").then(r => r.json());
-            const totalItems = warehouse.data.slice(1).reduce((sum, row) => sum + +row[3], 0);
-            document.getElementById('totalInventory').textContent = totalItems.toLocaleString();
-            
-            // تحميل التنبيهات
-            const alerts = [];
-            warehouse.data.slice(1).forEach(row => {
-                if (row[3] < 10) {
-                    alerts.push(`<div class="p-3 mb-2 bg-red-50 text-red-700 rounded-lg flex items-start">
-                        <i class="fas fa-exclamation-triangle mt-1 mr-2 text-red-500"></i>
-                        <span>الكمية منخفضة: ${row[0]} ${row[2]} (المتبقي: ${row[3]})</span>
-                    </div>`);
-                }
-            });
-            
-            document.getElementById('alerts').innerHTML = alerts.join('') || 
-                '<div class="p-3 bg-green-50 text-green-700 rounded-lg">لا توجد تنبيهات</div>';
-        } catch (error) {
-            console.error("Error loading dashboard stats:", error);
-            document.getElementById('alerts').innerHTML = 
-                '<div class="p-3 bg-red-50 text-red-700 rounded-lg">حدث خطأ أثناء تحميل الإحصائيات</div>';
-        }
-    }
-    
-    // تحميل أحدث الحركات
-    async function loadLatestTransactions() {
-        try {
-            const [incoming, outgoing] = await Promise.all([
-                fetch(apiUrl + "?sheet=الواردات").then(r => r.json()),
-                fetch(apiUrl + "?sheet=الصادرات").then(r => r.json())
-            ]);
-            
-            let transactions = [];
-            
-            // معالجة الواردات
-            incoming.data.slice(1).forEach(row => {
-                transactions.push({
-                    type: 'وارد',
-                    date: row[2] || 'غير محدد',
-                    amount: (+row[4] * +row[5]).toLocaleString() + ' ' + (row[6] || 'USD'),
-                    item: row[0]
-                });
-            });
-            
-            // معالجة الصادرات
-            outgoing.data.slice(1).forEach(row => {
-                transactions.push({
-                    type: 'صادر',
-                    date: row[2] || 'غير محدد',
-                    amount: (+row[4] * +row[5]).toLocaleString() + ' ' + (row[6] || 'USD'),
-                    item: row[0]
-                });
-            });
-            
-            // ترتيب الحركات حسب التاريخ (الأحدث أولاً)
-            transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-            
-            // عرض آخر 5 حركات
-            let html = '';
-            transactions.slice(0, 5).forEach(t => {
-                html += `
-                    <tr class="table-row">
-                        <td class="px-4 py-3 whitespace-nowrap ${t.type === 'وارد' ? 'text-green-600' : 'text-red-600'}">
-                            ${t.type}
-                        </td>
-                        <td class="px-4 py-3 whitespace-nowrap">${t.date}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${t.amount}</td>
-                    </tr>
-                `;
-            });
-            
-            document.getElementById('latestTransactions').innerHTML = html || 
-                '<tr><td colspan="3" class="px-4 py-3 text-center text-gray-500">لا توجد حركات</td></tr>';
-        } catch (error) {
-            console.error("Error loading latest transactions:", error);
-            document.getElementById('latestTransactions').innerHTML = 
-                '<tr><td colspan="3" class="px-4 py-3 text-center text-red-500">حدث خطأ أثناء تحميل الحركات</td></tr>';
-        }
-    }
-    
-    // تحميل بيانات المستودع
+
+    // باقي الدوال الأصلية (loadDashboardStats, loadLatestTransactions, etc...)
+    // ... [يجب الحفاظ على جميع الدوال الأخرى كما هي في ملفك الأصلي]
+    // تأكد فقط من استبدال جميع استدعاءات fetch القديمة بـ fetchData الجديدة
+
+    // دالة محسنة لتحميل المستودع
     async function loadWarehouse() {
-        try {
-            const response = await fetch(apiUrl + "?sheet=المخزون");
-            const data = await response.json();
-            let html = '';
+        const data = await fetchData("المخزون");
+        if (!data) return;
+
+        let html = '';
+        data.slice(1).forEach((row, index) => {
+            const qty = parseInt(row[3]);
+            const rowClass = qty < 10 ? 'bg-red-50' : qty < 20 ? 'bg-yellow-50' : '';
             
-            data.data.slice(1).forEach((row, index) => {
-                const qty = parseInt(row[3]);
-                const rowClass = qty < 10 ? 'bg-red-50' : qty < 20 ? 'bg-yellow-50' : '';
-                
-                html += `
-                    <tr class="${rowClass}">
-                        <td class="px-4 py-3 whitespace-nowrap">${row[0] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[1] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[2] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap font-medium ${qty < 10 ? 'text-red-600' : ''}">
-                            ${qty.toLocaleString()}
-                        </td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[4] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[5] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">
-                            <div class="flex space-x-2">
-                                <button onclick="editWarehouseItem(${index + 1})" class="edit-btn text-blue-600 hover:text-blue-900">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button onclick="deleteWarehouseItem(${index + 1})" class="delete-btn text-red-600 hover:text-red-900">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
-            
-            document.getElementById('warehouseList').innerHTML = html || 
-                '<tr><td colspan="7" class="px-4 py-3 text-center text-gray-500">لا توجد عناصر في المستودع</td></tr>';
-            
-            // تحديث معلومات الترقيم
-            document.getElementById('warehousePaginationInfo').textContent = 
-                `عرض 1 إلى ${Math.min(data.data.length - 1, itemsPerPage)} من ${data.data.length - 1} عنصر`;
-        } catch (error) {
-            console.error("Error loading warehouse data:", error);
-            document.getElementById('warehouseList').innerHTML = 
-                '<tr><td colspan="7" class="px-4 py-3 text-center text-red-500">حدث خطأ أثناء تحميل بيانات المستودع</td></tr>';
-        }
-    }
-    
-    // تحميل بيانات الواردات
-    async function loadIncoming() {
-        try {
-            const response = await fetch(apiUrl + "?sheet=الواردات");
-            const data = await response.json();
-            let html = '';
-            
-            data.data.slice(1).forEach((row, index) => {
-                const total = (+row[4] * +row[5]).toLocaleString();
-                
-                html += `
-                    <tr>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[0] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[1] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[2] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${(+row[4]).toLocaleString()}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${total} ${row[6] || 'USD'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[6] || 'USD'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">
-                            <div class="flex space-x-2">
-                                <button onclick="editIncomingItem(${index + 1})" class="edit-btn text-blue-600 hover:text-blue-900">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button onclick="deleteIncomingItem(${index + 1})" class="delete-btn text-red-600 hover:text-red-900">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
-            
-            document.getElementById('incomingList').innerHTML = html || 
-                '<tr><td colspan="7" class="px-4 py-3 text-center text-gray-500">لا توجد واردات مسجلة</td></tr>';
-            
-            // تحديث معلومات الترقيم
-            document.getElementById('incomingPaginationInfo').textContent = 
-                `عرض 1 إلى ${Math.min(data.data.length - 1, itemsPerPage)} من ${data.data.length - 1} عنصر`;
-        } catch (error) {
-            console.error("Error loading incoming data:", error);
-            document.getElementById('incomingList').innerHTML = 
-                '<tr><td colspan="7" class="px-4 py-3 text-center text-red-500">حدث خطأ أثناء تحميل بيانات الواردات</td></tr>';
-        }
-    }
-    
-    // تحميل بيانات الصادرات
-    async function loadOutgoing() {
-        try {
-            const response = await fetch(apiUrl + "?sheet=الصادرات");
-            const data = await response.json();
-            let html = '';
-            
-            data.data.slice(1).forEach((row, index) => {
-                const total = (+row[4] * +row[5]).toLocaleString();
-                
-                html += `
-                    <tr>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[0] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[1] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[2] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${(+row[4]).toLocaleString()}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${total} ${row[6] || 'USD'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[6] || 'USD'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">
-                            <div class="flex space-x-2">
-                                <button onclick="editOutgoingItem(${index + 1})" class="edit-btn text-blue-600 hover:text-blue-900">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button onclick="deleteOutgoingItem(${index + 1})" class="delete-btn text-red-600 hover:text-red-900">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
-            
-            document.getElementById('outgoingList').innerHTML = html || 
-                '<tr><td colspan="7" class="px-4 py-3 text-center text-gray-500">لا توجد صادرات مسجلة</td></tr>';
-            
-            // تحديث معلومات الترقيم
-            document.getElementById('outgoingPaginationInfo').textContent = 
-                `عرض 1 إلى ${Math.min(data.data.length - 1, itemsPerPage)} من ${data.data.length - 1} عنصر`;
-        } catch (error) {
-            console.error("Error loading outgoing data:", error);
-            document.getElementById('outgoingList').innerHTML = 
-                '<tr><td colspan="7" class="px-4 py-3 text-center text-red-500">حدث خطأ أثناء تحميل بيانات الصادرات</td></tr>';
-        }
-    }
-    
-    // تحميل التقارير
-    async function loadReports() {
-        try {
-            const [incoming, outgoing] = await Promise.all([
-                fetch(apiUrl + "?sheet=الواردات").then(r => r.json()),
-                fetch(apiUrl + "?sheet=الصادرات").then(r => r.json())
-            ]);
-            
-            const totalPurchases = incoming.data.slice(1).reduce((sum, row) => sum + (+row[4] * +row[5]), 0);
-            const totalSales = outgoing.data.slice(1).reduce((sum, row) => sum + (+row[4] * +row[5]), 0);
-            const profit = totalSales - totalPurchases;
-            
-            document.getElementById('reportTotalIncoming').textContent = totalPurchases.toLocaleString() + " USD";
-            document.getElementById('reportTotalOutgoing').textContent = totalSales.toLocaleString() + " USD";
-            document.getElementById('reportNetProfit').textContent = profit.toLocaleString() + " USD";
-            
-            // تحميل التقرير التفصيلي
-            let detailedHtml = '';
-            
-            // معالجة الواردات
-            incoming.data.slice(1).forEach(row => {
-                detailedHtml += `
-                    <tr>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[2] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap text-green-600">وارد: ${row[0]}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${(+row[4]).toLocaleString()}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${(+row[4] * +row[5]).toLocaleString()}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[6] || 'USD'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[1] || '-'}</td>
-                    </tr>
-                `;
-            });
-            
-            // معالجة الصادرات
-            outgoing.data.slice(1).forEach(row => {
-                detailedHtml += `
-                    <tr>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[2] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap text-red-600">صادر: ${row[0]}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${(+row[4]).toLocaleString()}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${(+row[4] * +row[5]).toLocaleString()}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[6] || 'USD'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[1] || '-'}</td>
-                    </tr>
-                `;
-            });
-            
-            document.getElementById('detailedReport').innerHTML = detailedHtml || 
-                '<tr><td colspan="6" class="px-4 py-3 text-center text-gray-500">لا توجد بيانات</td></tr>';
-        } catch (error) {
-            console.error("Error loading reports:", error);
-            document.getElementById('detailedReport').innerHTML = 
-                '<tr><td colspan="6" class="px-4 py-3 text-center text-red-500">حدث خطأ أثناء تحميل التقارير</td></tr>';
-        }
-    }
-    
-    // تحميل المستخدمين
-    async function loadUsers() {
-        try {
-            const response = await fetch(apiUrl + "?sheet=المستخدمين");
-            const data = await response.json();
-            let html = '';
-            
-            data.data.slice(1).forEach((row, index) => {
-                const statusClass = row[4] === 'نشط' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-                
-                html += `
-                    <tr>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[0] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[1] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[3] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">
-                            <span class="px-2 py-1 rounded-full text-xs font-medium ${statusClass}">
-                                ${row[4] || 'غير نشط'}
-                            </span>
-                        </td>
-                        <td class="px-4 py-3 whitespace-nowrap">${row[5] || '-'}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">
-                            <div class="flex space-x-2">
-                                <button onclick="editUser(${index + 1})" class="edit-btn text-blue-600 hover:text-blue-900">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button onclick="deleteUser(${index + 1})" class="delete-btn text-red-600 hover:text-red-900">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
-            
-            document.getElementById('usersList').innerHTML = html || 
-                '<tr><td colspan="6" class="px-4 py-3 text-center text-gray-500">لا توجد مستخدمين مسجلين</td></tr>';
-            
-            // تحديث معلومات الترقيم
-            document.getElementById('usersPaginationInfo').textContent = 
-                `عرض 1 إلى ${Math.min(data.data.length - 1, itemsPerPage)} من ${data.data.length - 1} عنصر`;
-        } catch (error) {
-            console.error("Error loading users:", error);
-            document.getElementById('usersList').innerHTML = 
-                '<tr><td colspan="6" class="px-4 py-3 text-center text-red-500">حدث خطأ أثناء تحميل بيانات المستخدمين</td></tr>';
-        }
-    }
-    
-    // توليد التقارير حسب العملة
-    async function generateReports() {
-        const currency = document.getElementById('reportCurrency').value;
-        const rate = exchangeRates[currency] || 1;
+            html += `
+                <tr class="${rowClass}">
+                    <td class="px-4 py-3 whitespace-nowrap">${row[0] || '-'}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">${row[1] || '-'}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">${row[2] || '-'}</td>
+                    <td class="px-4 py-3 whitespace-nowrap font-medium ${qty < 10 ? 'text-red-600' : ''}">
+                        ${qty.toLocaleString()}
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap">${row[4] || '-'}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">${row[5] || '-'}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        <div class="flex space-x-2">
+                            <button onclick="editWarehouseItem(${index + 1})" class="edit-btn text-blue-600 hover:text-blue-900">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteWarehouseItem(${index + 1})" class="delete-btn text-red-600 hover:text-red-900">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
         
-        try {
-            const [incoming, outgoing] = await Promise.all([
-                fetch(apiUrl + "?sheet=الواردات").then(r => r.json()),
-                fetch(apiUrl + "?sheet=الصادرات").then(r => r.json())
-            ]);
-            
-            const totalPurchases = incoming.data.slice(1).reduce((sum, row) => {
-                const rowCurrency = row[6] || 'USD';
-                const rowRate = exchangeRates[rowCurrency] || 1;
-                return sum + (+row[4] * +row[5] * (rowRate / rate));
-            }, 0);
-            
-            const totalSales = outgoing.data.slice(1).reduce((sum, row) => {
-                const rowCurrency = row[6] || 'USD';
-                const rowRate = exchangeRates[rowCurrency] || 1;
-                return sum + (+row[4] * +row[5] * (rowRate / rate));
-            }, 0);
-            
-            const profit = totalSales - totalPurchases;
-            
-            document.getElementById('reportTotalIncoming').textContent = totalPurchases.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }) + " " + currency;
-            
-            document.getElementById('reportTotalOutgoing').textContent = totalSales.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }) + " " + currency;
-            
-            document.getElementById('reportNetProfit').textContent = profit.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }) + " " + currency;
-            
-            showToast("تم تحديث التقارير حسب العملة المحددة", "success");
-        } catch (error) {
-            console.error("Error generating reports:", error);
-            showToast("حدث خطأ أثناء توليد التقارير", "error");
-        }
+        document.getElementById('warehouseList').innerHTML = html || 
+            '<tr><td colspan="7" class="px-4 py-3 text-center text-gray-500">لا توجد عناصر في المستودع</td></tr>';
     }
-    
-    // تصدير البيانات إلى Excel
-    async function exportToExcel() {
-        try {
-            const section = document.querySelector('.content-section:not(.hidden)').id.replace('Section', '');
-            const response = await fetch(apiUrl + `?sheet=${section}`);
-            const data = await response.json();
-            
-            // إنشاء محتوى CSV
-            let csvContent = "data:text/csv;charset=utf-8,";
-            
-            // العناوين
-            const headers = data.data[0].join(",");
-            csvContent += headers + "\r\n";
-            
-            // البيانات
-            data.data.slice(1).forEach(row => {
-                csvContent += row.join(",") + "\r\n";
-            });
-            
-            // إنشاء رابط التحميل
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `${section}_report.csv`);
-            document.body.appendChild(link);
-            
-            // تنزيل الملف
-            link.click();
-            document.body.removeChild(link);
-            
-            showToast("تم تصدير البيانات بنجاح", "success");
-        } catch (error) {
-            console.error("Error exporting to Excel:", error);
-            showToast("حدث خطأ أثناء تصدير البيانات", "error");
-        }
-    }
-    
-    // وظائف التعديل والحذف (ستحتاج إلى اكمالها حسب احتياجاتك)
-    function editWarehouseItem(row) {
-        alert(`سيتم تعديل عنصر المستودع في الصف ${row}`);
-        // يمكنك اكمال هذه الوظيفة لتحميل بيانات العنصر في النموذج
-    }
-    
-    function deleteWarehouseItem(row) {
-        if (confirm("هل أنت متأكد من حذف هذا العنصر من المستودع؟")) {
-            showToast("تم حذف العنصر من المستودع", "success");
-            // يمكنك اكمال هذه الوظيفة لحذف العنصر فعلياً
-        }
-    }
-    
-    function editIncomingItem(row) {
-        alert(`سيتم تعديل الواردة في الصف ${row}`);
-    }
-    
-    function deleteIncomingItem(row) {
-        if (confirm("هل أنت متأكد من حذف هذه الواردة؟")) {
-            showToast("تم حذف الواردة", "success");
-        }
-    }
-    
-    function editOutgoingItem(row) {
-        alert(`سيتم تعديل الصادرة في الصف ${row}`);
-    }
-    
-    function deleteOutgoingItem(row) {
-        if (confirm("هل أنت متأكد من حذف هذه الصادرة؟")) {
-            showToast("تم حذف الصادرة", "success");
-        }
-    }
-    
-    function editUser(row) {
-        alert(`سيتم تعديل المستخدم في الصف ${row}`);
-    }
-    
-    function deleteUser(row) {
-        if (confirm("هل أنت متأكد من حذف هذا المستخدم؟")) {
-            showToast("تم حذف المستخدم", "success");
-        }
-    }
-    
-    // تهيئة النماذج عند تحميل الصفحة
+
+    // [استمر في وضع جميع الدوال الأخرى كما هي مع استبدال fetch بـ fetchData]
+
+    // أخيراً: تهيئة الأحداث
     document.addEventListener('DOMContentLoaded', () => {
-        // نموذج إضافة عنصر للمستودع
+        // تهيئة نماذج الإضافة
         document.getElementById('addWarehouseForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -1908,15 +1119,10 @@
             };
             
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `action=add&sheet=المخزون&values=${JSON.stringify(Object.values(formData))}&user=${currentUser.username}`
-                }).then(r => r.json());
+                const response = await fetch(`${apiUrl}?action=add&sheet=المخزون&values=${JSON.stringify(Object.values(formData))}&user=${currentUser.username}`);
+                const result = await response.json();
                 
-                if (response.status === "success") {
+                if (result.status === "success") {
                     showToast("تم إضافة العنصر إلى المستودع بنجاح", "success");
                     toggleWarehouseForm();
                     loadWarehouse();
@@ -1929,149 +1135,18 @@
                 showToast("حدث خطأ في الاتصال بالخادم", "error");
             }
         });
-        
-        // نموذج إضافة واردة
-        document.getElementById('addIncomingForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const formData = {
-                type: document.getElementById('iType').value,
-                supplier: document.getElementById('iSupplier').value,
-                date: document.getElementById('iDate').value,
-                invoice: document.getElementById('iInvoice').value,
-                quantity: document.getElementById('iQty').value,
-                price: document.getElementById('iPrice').value,
-                currency: document.getElementById('iCurrency').value,
-                exchangeRate: document.getElementById('iExchangeRate').value || exchangeRates[document.getElementById('iCurrency').value] || 1,
-                payment: document.getElementById('iPayment').value,
-                notes: document.getElementById('iNotes').value
-            };
-            
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `action=add&sheet=الواردات&values=${JSON.stringify(Object.values(formData))}&user=${currentUser.username}`
-                }).then(r => r.json());
-                
-                if (response.status === "success") {
-                    showToast("تم إضافة الواردة بنجاح", "success");
-                    toggleIncomingForm();
-                    loadIncoming();
-                    loadDashboardStats();
-                    loadReports();
-                } else {
-                    showToast("حدث خطأ أثناء إضافة الواردة", "error");
-                }
-            } catch (error) {
-                console.error("Error adding incoming item:", error);
-                showToast("حدث خطأ في الاتصال بالخادم", "error");
-            }
-        });
-        
-        // نموذج إضافة صادرة
-        document.getElementById('addOutgoingForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const formData = {
-                type: document.getElementById('oType').value,
-                customer: document.getElementById('oCustomer').value,
-                date: document.getElementById('oDate').value,
-                invoice: document.getElementById('oInvoice').value,
-                quantity: document.getElementById('oQty').value,
-                price: document.getElementById('oPrice').value,
-                currency: document.getElementById('oCurrency').value,
-                exchangeRate: document.getElementById('oExchangeRate').value || exchangeRates[document.getElementById('oCurrency').value] || 1,
-                payment: document.getElementById('oPayment').value,
-                notes: document.getElementById('oNotes').value
-            };
-            
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `action=add&sheet=الصادرات&values=${JSON.stringify(Object.values(formData))}&user=${currentUser.username}`
-                }).then(r => r.json());
-                
-                if (response.status === "success") {
-                    showToast("تم إضافة الصادرة بنجاح", "success");
-                    toggleOutgoingForm();
-                    loadOutgoing();
-                    loadDashboardStats();
-                    loadReports();
-                } else {
-                    showToast("حدث خطأ أثناء إضافة الصادرة", "error");
-                }
-            } catch (error) {
-                console.error("Error adding outgoing item:", error);
-                showToast("حدث خطأ في الاتصال بالخادم", "error");
-            }
-        });
-        
-        // نموذج إضافة مستخدم
-        document.getElementById('addUserForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const password = document.getElementById('uPassword').value;
-            const confirmPassword = document.getElementById('uConfirmPassword').value;
-            
-            if (password !== confirmPassword) {
-                showToast("كلمة المرور وتأكيدها غير متطابقين", "error");
-                return;
-            }
-            
-            const formData = {
-                name: document.getElementById('uName').value,
-                username: document.getElementById('uUsername').value,
-                password: password,
-                role: document.getElementById('uRole').value,
-                status: document.getElementById('uStatus').value,
-                lastActivity: new Date().toLocaleDateString()
-            };
-            
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `action=add&sheet=المستخدمين&values=${JSON.stringify(Object.values(formData))}&user=${currentUser.username}`
-                }).then(r => r.json());
-                
-                if (response.status === "success") {
-                    showToast("تم إضافة المستخدم بنجاح", "success");
-                    toggleUserForm();
-                    loadUsers();
-                } else {
-                    showToast("حدث خطأ أثناء إضافة المستخدم", "error");
-                }
-            } catch (error) {
-                console.error("Error adding user:", error);
-                showToast("حدث خطأ في الاتصال بالخادم", "error");
-            }
-        });
-        
-        // تحديث أسعار الصرف عند تغيير العملة
-        document.getElementById('iCurrency').addEventListener('change', function() {
-            document.getElementById('iExchangeRate').value = exchangeRates[this.value] || 1;
-        });
-        
-        document.getElementById('oCurrency').addEventListener('change', function() {
-            document.getElementById('oExchangeRate').value = exchangeRates[this.value] || 1;
-        });
+
+        // [أضف هنا بقية معالجات النماذج الأخرى بنفس الطريقة]
     });
-    
+
     // تحديث تلقائي للبيانات كل دقيقة
     setInterval(() => {
         if (currentUser) {
             refreshAllData();
         }
     }, 60000);
-    </script>
+</script>
 </body>
 
 </html>
+
